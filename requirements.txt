@@ -7,3 +7,4 @@ pytesseract
 pdf2image
 pdfplumber
 python-dotenv
+gunicorn
