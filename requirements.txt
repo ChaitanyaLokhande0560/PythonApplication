@@ -1,0 +1,9 @@
+Flask
+openai
+python-docx
+requests
+Pillow
+pytesseract
+pdf2image
+pdfplumber
+python-dotenv
