@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for
+from flask import Flask, request, jsonify, render_template, redirect, url_for , session , g
 from openai import OpenAI
 import os
 import docx
@@ -18,22 +18,16 @@ from decimal import Decimal
 from re import sub
 import traceback
 from dotenv import load_dotenv
+import base64
+from Crypto.Cipher import AES
+import base64
+import hashlib
 
 load_dotenv()
 
 apikey=  os.getenv("API_KEY", "")
 app = Flask(__name__)
-ordway_app_url = os.getenv("ORDWAY_APP_URL", "https://staging.ordwaylabs.com/")
-cust_api_url =  ordway_app_url + "api/v1/customers"
-sub_api_url = ordway_app_url + "api/v1/subscriptions"
-headers = {
-        "Content-Type": os.getenv("CONTENT_TYPE", "application/json"),
-        "X-User-Company": os.getenv("X_USER_COMPANY", ""),
-        "X-User-Token": os.getenv("X_USER_TOKEN", ""),
-        "X-User-Email": os.getenv("X_USER_EMAIL", ""),
-        "X-Company-Token": os.getenv("X_COMPANY_TOKEN", "")
-    }
- 
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "your-session-secret-key") 
 
 
 client = OpenAI(api_key = apikey)
@@ -93,6 +87,91 @@ Contract Text:
 \"\"\"
 """
 
+def safe_b64decode(data):
+    """Ensure the Base64 string is correctly padded and handle URL-safe encoding."""
+    # Check if the data is URL-safe Base64 encoded
+    data = data.replace('-', '+').replace('_', '/')
+    
+    # Ensure padding is correct
+    missing_padding = len(data) % 4
+    if missing_padding:
+        data += '=' * (4 - missing_padding)
+
+    try:
+        return base64.b64decode(data)
+    except Exception as e:
+        print(f"Base64 decoding error: {e}")
+        raise ValueError("Invalid Base64 encoding.")
+
+
+def decrypt_and_verify(data_b64, key_b64, iv_b64, hmac_secret):
+    # Decode from Base64
+    encrypted_data = safe_b64decode(data_b64)
+    key = safe_b64decode(key_b64)
+    iv = safe_b64decode(iv_b64)
+
+
+    # Decrypt using AES-256-CBC
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    decrypted = cipher.decrypt(encrypted_data)
+
+    # Remove PKCS7 padding
+    pad_len = decrypted[-1]
+    unpadded = decrypted[:-pad_len]
+
+    # Parse JSON
+    return json.loads(unpadded.decode())
+
+
+def decrypt_and_store_in_session():
+    try:
+        # Extract query params
+        raw_data = request.args.get("data")
+        raw_key = request.args.get("key")
+        raw_iv = request.args.get("iv")
+        ruby_output = {
+            "data": (raw_data),
+            "key": (raw_key),
+            "iv": (raw_iv)
+        }
+        hmac_secret = os.getenv("HMAC_SECRETE", ""),
+
+        result = decrypt_and_verify(
+            ruby_output["data"],
+            ruby_output["key"],
+            ruby_output["iv"],
+            hmac_secret
+        )
+
+        # Store in session
+        session['headers'] = {
+            "Content-Type": "application/json",
+            "X-User-Company": result.get("X_USER_COMPANY", ""),
+            "X-User-Token": result.get("X_USER_TOKEN", ""),
+            "X-User-Email": result.get("X_USER_EMAIL", ""),
+        }
+        session['ordway_url'] = result.get("ORIGIN_HOST","")
+
+        return None
+    except Exception as e:
+        print("Decryption error:", str(e))
+@app.before_request
+def apply_decrypted_headers():
+    # Only decrypt if 'data' param is present
+    if 'data' in request.args:
+        error = decrypt_and_store_in_session()
+        if error:
+            return error
+
+    # Use decrypted headers from session
+    g.headers = {
+        **session.get('headers', {})
+    }
+    g.ordway_app_url = session.get('ordway_url',"")
+    g.cust_api_url =  g.ordway_app_url + "/api/v1/customers"
+    g.sub_api_url = g.ordway_app_url + "/api/v1/subscriptions"
+
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -139,8 +218,8 @@ def extract_metadata():
         print("extracted metadata:", metadata)
         # Send metadata to subscription API
         api_status, api_response = create_ordway_subscription(metadata)
-        #print("API Response:", api_status, api_response)
-        return redirect(ordway_app_url+"subscriptions/"+json.loads(api_response).get("id"))
+        print("API Response:", api_status, api_response)
+        return redirect(g.ordway_app_url+"subscriptions/"+json.loads(api_response).get("id"))
 
         #return metadata_json
     except Exception as e:
@@ -182,16 +261,15 @@ def extract_text_from_file(file):
 # Example function to send metadata to external subscription API
 def create_ordway_customer(metadata_json):
     try:
-        print(metadata_json)
         #check if customer already exists
         cust_name = json.loads(metadata_json).get("parties", ["Unknown"])[1]
-        print("Customer Name:", cust_name + "----" + cust_api_url+"?name="+"'"+cust_name+"'")
+        print("Customer Name:", cust_name + "----" + g.cust_api_url+"?name="+"'"+cust_name+"'")
 
         params = {
             "name": cust_name
         }
         
-        response = requests.get(cust_api_url, params=params, headers=headers)
+        response = requests.get(g.cust_api_url, params=params, headers=g.headers)
         print("Customer API Response:", response.status_code, response.text)
         if response.status_code == 200 and "id" in response.text:
             print("Customer already exists, use this customer id.")
@@ -200,7 +278,7 @@ def create_ordway_customer(metadata_json):
             #return response
         else:
             print("Customer not found, creating new customer.")
-            response = requests.post(cust_api_url, headers=headers, json=create_customer_payload(metadata_json))
+            response = requests.post(g.cust_api_url, headers=g.headers, json=create_customer_payload(metadata_json))
             print("Customer API Response:", response.status_code, response.text)
             if response.status_code == 200 and "id" in response.text:
                 cust_id = json.loads(response.text).get("id")
@@ -221,7 +299,7 @@ def create_ordway_subscription(metadata_json):
             raise Exception("Customer does not exist or cannot be created")
         
         print("Customer ID:", cust_id)
-        response = requests.post(sub_api_url, headers=headers, json=create_subscription_payload(metadata_json,cust_id))
+        response = requests.post(g.sub_api_url, headers=g.headers, json=create_subscription_payload(metadata_json,cust_id))
         print("Subscription API Response:", response.status_code, response.text)
         return response.status_code, response.text
     except Exception as e:
@@ -294,6 +372,8 @@ def normalize_date(date_str):
         "%d %b %Y"      # 1 Jan 2024
     ]
     
+    date_str = date_str.replace('rd', '').replace('th', '').replace('st', '').replace('nd', '')
+    print(f"Date format for '{date_str}'")
     for fmt in formats:
         try:
             parsed_date = datetime.datetime.strptime(date_str.strip(), fmt)
