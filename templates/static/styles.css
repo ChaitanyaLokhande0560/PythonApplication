@@ -1,0 +1,119 @@
+/* styles.css */
+
+body {
+  font-family: "Roboto", sans-serif;
+  background: #f9fbfd;
+  margin: 0;
+  padding: 0;
+  color: #333;
+}
+
+.form-header{
+  font-size: 30px;
+  font-weight: 500;
+  margin-top: 10px;
+}
+
+#header {
+  background-color: #2C3D4F;
+  padding: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+#header h1 {
+  font-size: 1.8rem;
+  font-weight: 500;
+  margin: 0;
+  color: #2c3e50;
+}
+
+#upload-form {
+  padding: 20px;
+  padding-inline: 70px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+#drop-area {
+  border: 2px dashed #ccc;
+  border-radius: 10px;
+  padding: 40px;
+  text-align: center;
+  background: #fafafa;
+  transition: border-color 0.3s ease;
+  cursor: pointer;
+}
+
+#drop-area.highlight {
+  border-color: #28a745;
+  background-color: #f0fff0;
+}
+
+.icon {
+  font-size: 48px;
+  color: #888;
+  margin-bottom: 10px;
+}
+
+#file-preview {
+  margin-top: 10px;
+  color: #555;
+  font-size: 0.95rem;
+}
+
+textarea {
+  height: 200px;
+  margin-top: 20px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  padding: 12px;
+  font-size: 1rem;
+  resize: vertical;
+}
+.textarea{
+    margin-top: 2%;
+    display: flex;
+    flex-direction: column;
+}
+.buttons{
+    display: flex;
+    column-gap: 10px;
+    width: 100%;
+    justify-content: flex-end;
+    font-weight: 600;
+}
+button {
+  padding: 10px 20px;
+  margin-top: 20px;
+  font-size: 0.875rem;
+  background-color: #E36C09;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background 0.3s;
+  border-radius: 20px;
+  cursor: pointer;
+}
+.cancel-button{
+    background-color: transparent;
+    color: #E36C09;
+    cursor: pointer;
+}
+
+
+input[type="file"] {
+  display: none;
+}
+label{
+    font-weight: 500;
+}
+
+.ordway-logo{
+    width: 150px;
+    height: 30px;
+    margin-left: 2%;
+}
