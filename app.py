@@ -219,7 +219,7 @@ def extract_metadata():
         # Send metadata to subscription API
         api_status, api_response = create_ordway_subscription(metadata)
         print("API Response:", api_status, api_response)
-        return redirect(g.ordway_app_url+"subscriptions/"+json.loads(api_response).get("id"))
+        return redirect(g.ordway_app_url+"/subscriptions/"+json.loads(api_response).get("id"))
 
         #return metadata_json
     except Exception as e:
